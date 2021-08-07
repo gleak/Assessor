@@ -213,7 +213,7 @@ public class SeleniumTreeDecomposer {
 				continue; //Don't add the System.out.println
 				
 			}
-			//Because each node is linked with another node, if the node isn't cloned the program will crash because the structure that holds the node is not modifiable
+			//Because each node is linked with others node, if the node isn't cloned the program will crash because the structure that holds the node is not modifiable
 			Node clonedNode = node.clone();
 			
 			BlockStmt bodyMethod = methodToAddStatement.getBody().get();
@@ -224,20 +224,27 @@ public class SeleniumTreeDecomposer {
 					analyzeMethodArguments(expStmt,values,arguments);			
 				//If the statement doesn't start with assert means that it is a normal call, also the pageObject needed to be inizialited
 				if(expStmt.toString().startsWith("assert") && lastPageObject!=null) {
-					//TODO add call to this method declaration
-					//TODO create a new Getter for this assert
-					analyzeAssertCallExpStmt(
-							methodTestSuite, 
-							lastPageObject,
-							localFieldDeclaration.get(lastPageObject.getNameAsString()), 
-							methodToAddStatement,
-							bodyMethod,
-							expStmt,
-							values,
-							arguments);	
-					//Return to write in the main statement as default
+					//Add the previews call method, that will return void
+					addPageObjectCall(methodTestSuite, lastPageObject, methodToAddStatement, localFieldDeclaration.get(lastPageObject.getNameAsString()),values,arguments);
+					values.clear();
+					arguments.clear();
+					
+					//if the method contains a search for an element, then create the statement
+					if(expStmt.toString().contains("driver.findElement")) { 						
+						analyzeAssertCallExpStmt(
+								methodTestSuite, 
+								lastPageObject,
+								localFieldDeclaration.get(lastPageObject.getNameAsString()), 		
+								expStmt);	
+					}else { //nothing special with this assert
+						bodyMethod = methodTestSuite.getBody().get();
+						bodyMethod.addStatement(expStmt);	
+					}		
+					
 					lastPageObject = null;
 					methodToAddStatement = methodTestSuite;		
+					//Return to write in the main statement as default
+					
 				}
 				else { 
 					//if it's not a special statement (assert), just add it to the bodyMethod of the TestMethod or PageObject Method
@@ -523,51 +530,76 @@ public class SeleniumTreeDecomposer {
 	/*Assert Call Analyzer */
 	
 	/** This method will analyze a Single Assert instruction
-	 *  
+	 * 
 	 * @param methodTestSuite
+	 * @param pageObject
 	 * @param pageObjectVariable
-	 * @param methodPO
-	 * @param bodyMethod
 	 * @param expression
-	 * @param values
-	 * @param argumentsName
 	 */
 	private void analyzeAssertCallExpStmt(MethodDeclaration methodTestSuite, ClassOrInterfaceDeclaration pageObject, String pageObjectVariable,
-			MethodDeclaration methodPO, BlockStmt bodyMethod,
-			ExpressionStmt expression,
-			List<Node> values,
-			List<NameExpr> argumentsName) {
+			ExpressionStmt expression) {
+		//TODO create a new Getter for this assert
+		//TODO detect an appropriate Getter Statement
+		BlockStmt bodyMethod;
 		MethodCallExpr assertCall = (MethodCallExpr) expression.getExpression();
 		List<Node> childNodes = assertCall.getChildNodes(); 
-		//Node 0 is the commnad
-		//Node 1 is the Locator
-		//Node 2 is the optional value to check			
-		switch(childNodes.get(0).toString()) {
-			case "assertEquals":
-			case "assertThat":							
-				methodPO.setType("String");
-				break;
-			case "assertTrue":
-			case "assertFalse":							
-				methodPO.setType("boolean");
-				break;
-			default:						
-				throw new UnsupportedOperationException("No conversion found for this istruction: " +childNodes.get(0).toString() );					
-		}												
-		MethodCallExpr methodCall = (MethodCallExpr) childNodes.get(1);
-		bodyMethod.addStatement("return " + methodCall+";");	
-		//Add Method To PO
-		addMethod(methodPO,pageObject,values,argumentsName);	
+		
+		MethodDeclaration methodPO = searchGetterInPO(pageObject,assertCall);
+		boolean addBodyToPO = methodPO==null;
+		if(addBodyToPO) {
+			//create the method PO statement			
+			methodPO = new MethodDeclaration() 					
+					.setName(generateNameForGetterCalls(assertCall))
+					.setPublic(true);
+			bodyMethod = methodPO.getBody().get();
+			//Node 0 is the commnad
+			//Node 1 is the Locator
+			//Node 2 is the optional value to check			
+			switch(childNodes.get(0).toString()) {
+				case "assertEquals":
+				case "assertThat":							
+					methodPO.setType("String");
+					break;
+				case "assertTrue":
+				case "assertFalse":							
+					methodPO.setType("boolean");
+					break;
+				default:						
+					throw new UnsupportedOperationException("No conversion found for this istruction: " +childNodes.get(0).toString() );					
+			}												
+			MethodCallExpr methodCall = (MethodCallExpr) childNodes.get(1);
+			bodyMethod.addStatement("return " + methodCall+";");	
+			//Add Method To PO
+			addMethod(methodPO,pageObject,null,null);	
+		}	
 		//Now add the assert in the Main Function	
 		bodyMethod = methodTestSuite.getBody().get();	
 		//Create the statement
-		String statement = createAssertWithNormalStmt(childNodes,pageObjectVariable, methodPO, values);									
-		bodyMethod.addStatement(statement);
-		values.clear();
-		argumentsName.clear();
+		String statement = createAssertWithNormalStmt(childNodes,pageObjectVariable, methodPO, null);									
+		bodyMethod.addStatement(statement);		
 	}
 
 		
+	private MethodDeclaration searchGetterInPO(ClassOrInterfaceDeclaration pageObject, MethodCallExpr methodCall) {
+		String generatedName = generateNameForGetterCalls(methodCall);
+		for(MethodDeclaration method : pageObject.findAll(MethodDeclaration.class)) {
+			if(method.getNameAsString().equals(generatedName)) 
+				return method;
+		}
+		return null;
+	}
+
+	private String generateNameForGetterCalls(MethodCallExpr expression) {
+		//The first node contains the assert, the second contains the methodCall to the locator
+		MethodCallExpr firstArgumentInvocation = (MethodCallExpr) expression.getChildNodes().get(1);
+		MethodCallExpr findElementInvocation = (MethodCallExpr) firstArgumentInvocation.getChildNodes().get(0);
+		//The third elment contains the Locator invocation
+		MethodCallExpr locatorInvocation = (MethodCallExpr) findElementInvocation.getChildNodes().get(2);
+		List<Node> nodes = locatorInvocation.getChildNodes();
+		//[By, id/css/others, 'identifier']		
+		return "getFor"+nodes.get(1).toString().toUpperCase()+"_"+nodes.get(2).toString().replace("-", "_").replace("\"", "");
+	}
+
 	/** This method will analyze a BlockStmt assert instruction
 	 * 
 	 * @param methodTestSuite
