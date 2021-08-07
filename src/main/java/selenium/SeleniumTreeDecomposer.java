@@ -179,9 +179,7 @@ public class SeleniumTreeDecomposer {
 				//if a pageObject is found, the create the pageObject calls
 				if(lastPageObject!=null)
 					addPageObjectCall(methodTestSuite, lastPageObject, methodToAddStatement, localFieldDeclaration.get(lastPageObject.getNameAsString()),values,arguments);					
-				//Reset the argument/values list
-				values.clear();
-				arguments.clear();
+
 				//if the instruction is to go back to the write to the main Test Method
 				//clear the lastPageObject and change the method where to add statement
 				if(delimiterEnd) {					
@@ -224,10 +222,9 @@ public class SeleniumTreeDecomposer {
 					analyzeMethodArguments(expStmt,values,arguments);			
 				//If the statement doesn't start with assert means that it is a normal call, also the pageObject needed to be inizialited
 				if(expStmt.toString().startsWith("assert") && lastPageObject!=null) {
+				
 					//Add the previews call method, that will return void
-					addPageObjectCall(methodTestSuite, lastPageObject, methodToAddStatement, localFieldDeclaration.get(lastPageObject.getNameAsString()),values,arguments);
-					values.clear();
-					arguments.clear();
+					addPageObjectCall(methodTestSuite, lastPageObject, methodToAddStatement, localFieldDeclaration.get(lastPageObject.getNameAsString()),values,arguments);	
 					
 					//if the method contains a search for an element, then create the statement
 					if(expStmt.toString().contains("driver.findElement")) { 						
@@ -266,10 +263,9 @@ public class SeleniumTreeDecomposer {
 						ExpressionStmt expStmt = (ExpressionStmt)child.clone();
 						analyzeMethodArguments(expStmt,values,arguments);	
 						blockParsed.addAndGetStatement(expStmt);
-					}
-					
-				}		
-			} else if (clonedNode instanceof Comment) {
+					}					
+				}
+			}else if (clonedNode instanceof Comment) {
 				bodyMethod.addOrphanComment((Comment) clonedNode);
 			}else 
 				bodyMethod.addStatement((Statement) clonedNode);						
@@ -281,9 +277,7 @@ public class SeleniumTreeDecomposer {
 	}
 
 
-	
-
-	/** Search in all the command of the BlockStmt if there is a assert call
+	 /** Search in all the command of the BlockStmt if there is a assert call
 	 * return true if the assert call exist else false
 	 * @param blockInstruction
 	 * @return
@@ -307,11 +301,17 @@ public class SeleniumTreeDecomposer {
 	private void addPageObjectCall(MethodDeclaration methodTestSuite, ClassOrInterfaceDeclaration pageObject,
 			MethodDeclaration methodPO, String pageObjectVariable,
 			List<Node> values, 
-			List<NameExpr> argument) {		
-		MethodDeclaration methodAdded = addMethod( methodPO,  pageObject,values,argument);
-		addCallToMethod(pageObjectVariable,methodTestSuite,methodAdded,values);
+			List<NameExpr> argument) {	
+		
+		if(methodPO.getBody().get().getChildNodes().size()==0) { //No instruction found
+			addWarning("The method declaration " +methodPO.getNameAsString() +" in the pageObject: "+pageObject.getNameAsString() + " is empty. So it will be discharged" );			
+		}else {
+			MethodDeclaration methodAdded = addMethod( methodPO,  pageObject,values,argument);
+			addCallToMethod(pageObjectVariable,methodTestSuite,methodAdded,values);
+		}
+		values.clear();
+		argument.clear();
 	}
-
 
 
 	/** Search in all the Compilation unit if the pageObject is already declared
@@ -373,8 +373,6 @@ public class SeleniumTreeDecomposer {
 		statement+=");";		
 		methodWhoCalls.getBody().get().addStatement(statement);		
 	}
-
-
 
 
 	/* Utility Method for JavaParser */
@@ -537,13 +535,10 @@ public class SeleniumTreeDecomposer {
 	 * @param expression
 	 */
 	private void analyzeAssertCallExpStmt(MethodDeclaration methodTestSuite, ClassOrInterfaceDeclaration pageObject, String pageObjectVariable,
-			ExpressionStmt expression) {
-		//TODO create a new Getter for this assert
-		//TODO detect an appropriate Getter Statement
+			ExpressionStmt expression) {	
 		BlockStmt bodyMethod;
 		MethodCallExpr assertCall = (MethodCallExpr) expression.getExpression();
-		List<Node> childNodes = assertCall.getChildNodes(); 
-		
+		List<Node> childNodes = assertCall.getChildNodes(); 		
 		MethodDeclaration methodPO = searchGetterInPO(pageObject,assertCall);
 		boolean addBodyToPO = methodPO==null;
 		if(addBodyToPO) {
@@ -579,7 +574,13 @@ public class SeleniumTreeDecomposer {
 		bodyMethod.addStatement(statement);		
 	}
 
-		
+	/** Search if the getter is already defined in the PageObject
+	 * if it is already defined the method is return else null
+	 * 
+	 * @param pageObject
+	 * @param methodCall
+	 * @return
+	 */
 	private MethodDeclaration searchGetterInPO(ClassOrInterfaceDeclaration pageObject, MethodCallExpr methodCall) {
 		String generatedName = generateNameForGetterCalls(methodCall);
 		for(MethodDeclaration method : pageObject.findAll(MethodDeclaration.class)) {
@@ -588,7 +589,12 @@ public class SeleniumTreeDecomposer {
 		}
 		return null;
 	}
-
+	
+	/** Generate the name for a getter Call
+	 * 
+	 * @param expression
+	 * @return
+	 */
 	private String generateNameForGetterCalls(MethodCallExpr expression) {
 		//The first node contains the assert, the second contains the methodCall to the locator
 		MethodCallExpr firstArgumentInvocation = (MethodCallExpr) expression.getChildNodes().get(1);
@@ -597,10 +603,19 @@ public class SeleniumTreeDecomposer {
 		MethodCallExpr locatorInvocation = (MethodCallExpr) findElementInvocation.getChildNodes().get(2);
 		List<Node> nodes = locatorInvocation.getChildNodes();
 		//[By, id/css/others, 'identifier']		
-		return "getFor"+nodes.get(1).toString().toUpperCase()+"_"+nodes.get(2).toString().replace("-", "_").replace("\"", "");
+		return "getFor"+nodes.get(1).toString().toUpperCase()+"_"+cleanCharacterForMethod(nodes.get(2).toString());
+	}
+	
+	/** Replace invalid character like - , ", : and . for a methodDeclaration
+	 * 
+	 * @param value
+	 * @return
+	 */
+	private String cleanCharacterForMethod(String value) {
+		return value.replace("-","_").replace("\"", "").replace(":", "").replace(".", "");
 	}
 
-	/** This method will analyze a BlockStmt assert instruction
+	/** This method will analyze a BlockStmt assert instruction 
 	 * 
 	 * @param methodTestSuite
 	 * @param lastPageVariable
@@ -627,7 +642,7 @@ public class SeleniumTreeDecomposer {
 				
 				addMethod(methodPO,pageObject,values,argumentsName);
 				String statement;
-				if( child instanceof AssertStmt) { //per questo è un caso speciale
+				if( child instanceof AssertStmt) { //this is a special case
 					statement = createAssertWithAssertStmt(lastPageVariable, methodPO, values, child, variableDecl);	
 				}else {
 					List<Node> childNodes = ((MethodCallExpr)((ExpressionStmt)child).getExpression()).getChildNodes(); 
@@ -645,7 +660,15 @@ public class SeleniumTreeDecomposer {
 		values.clear();
 		argumentsName.clear();
 	}
-
+	
+	/** Create the String instruction for an assert, with the optional argument call list
+	 * 
+	 * @param childNodes
+	 * @param lastPageVariable
+	 * @param methodPO
+	 * @param values
+	 * @return
+	 */
 	private String createAssertWithNormalStmt(List<Node> childNodes,String lastPageVariable, MethodDeclaration methodPO, List<Node> values) {
 		String statement = childNodes.get(0).toString() +"(";		
 		statement+=lastPageVariable+"."+methodPO.getNameAsString()+"(";
@@ -656,11 +679,20 @@ public class SeleniumTreeDecomposer {
 		statement+=");";
 		return statement;
 	}
-
+	
+	/** Create an assert base statement, that means the entire check is execute in an expression like that assert(somethingTrue/False)
+	 * 
+	 * @param lastPageVariable
+	 * @param methodPO
+	 * @param values
+	 * @param assertNode
+	 * @param variableDecl
+	 * @return
+	 */
 	private String createAssertWithAssertStmt(String lastPageVariable, MethodDeclaration methodPO, List<Node> values,
-			Node child, VariableDeclarator variableDecl) {
+			Node assertNode, VariableDeclarator variableDecl) {
 		String statement;
-		AssertStmt asserStmt = (AssertStmt) child;
+		AssertStmt asserStmt = (AssertStmt) assertNode;
 		EnclosedExpr enclosedExp = (EnclosedExpr) asserStmt.getChildNodes().get(0);
 		BinaryExpr binaryExpr = (BinaryExpr) enclosedExp.getChildNodes().get(0);
 		statement = "assert("; 					
@@ -736,20 +768,16 @@ public class SeleniumTreeDecomposer {
 		boolean containsSendKeys = expStmt.toString().contains("sendKeys");
 		boolean containsXPath  = expStmt.toString().contains("By.xpath");
 		
-		if(!containsSendKeys && !containsXPath) { 			
-			return; //no sendKeys or Xpath means no argument to check
-		}
+		if(!containsSendKeys && !containsXPath) 		
+			return; //no sendKeys or Xpath means no argument to check		
 		
-		MethodCallExpr methodCall = (MethodCallExpr) expStmt.getChildNodes().get(0);
-		
+		MethodCallExpr methodCall = (MethodCallExpr) expStmt.getChildNodes().get(0);		
 		List<Node> childs = methodCall.getChildNodes();	
-		if(containsSendKeys) {
+		if(containsSendKeys) 
 			extractArgumentFromSendKeys(childs,methodCall, values, variables  );
-		}
-		
-		if(containsXPath) {				
+		if(containsXPath) 		
 			extractArgumentFromXPath((MethodCallExpr)childs.get(0),values, variables );
-		}
+		
 		
 	}
 	
@@ -835,6 +863,11 @@ public class SeleniumTreeDecomposer {
 	private void addLog(String log) {
 		logs.add((new Date()).toLocaleString() +" - "+log);
 	}
+	
+	/** Return the main CompilationUnit where all the TestMethod is declared
+	 * 
+	 * @return
+	 */
 
 	public CompilationUnit getTestSuiteUnit() {		
 		return centralUnit;
