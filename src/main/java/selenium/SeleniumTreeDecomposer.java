@@ -689,9 +689,9 @@ public class SeleniumTreeDecomposer {
 	}
 
 
-	/** For each ExpressionStmt will search if it's a MethodCallExpr that contains sendKeys
+	/** For each ExpressionStmt will search if it's a MethodCallExpr that contains sendKeys or By.xpath
 	 * In that case it will change the node inside the call and replace it with a variable
-	 * Then will add this variable and the original value in values and the variable will be inserted in the variables list
+	 * Then will add this variable and the original value in memory for create the correct call and method invocation
 	 * @param expStmt 
 	 * @param values list of real values
 	 * @param variables list of variable
@@ -712,17 +712,24 @@ public class SeleniumTreeDecomposer {
 		
 		List<Node> childs = methodCall.getChildNodes();	
 		if(containsSendKeys) {
-			extractArgumentFromSendKeys(values, variables, methodCall, childs);
+			extractArgumentFromSendKeys(childs,methodCall, values, variables  );
 		}
 		
 		if(containsXPath) {				
-			extractArgumentFromXPath((MethodCallExpr)childs.get(0),values, variables, methodCall);
+			extractArgumentFromXPath((MethodCallExpr)childs.get(0),values, variables );
 		}
 		
 	}
 	
-	private void extractArgumentFromSendKeys(List<Node> values, List<NameExpr> variables, MethodCallExpr methodCall,
-			List<Node> childs) {
+	/** Extract the argument from the sendKeys command
+	 * 
+	 * @param values
+	 * @param variables
+	 * @param methodCall
+	 * @param childs
+	 */
+	private void extractArgumentFromSendKeys(List<Node> childs, MethodCallExpr methodCall,    List<Node> values, List<NameExpr> variables
+			) {
 		for(int i=0;i<childs.size();i++) {
 			Node node = childs.get(i);
 			if(node instanceof SimpleName) {
@@ -742,7 +749,13 @@ public class SeleniumTreeDecomposer {
 		}
 	}
 	
-	private void extractArgumentFromXPath(MethodCallExpr methodCallExpr, List<Node> values, List<NameExpr> variables, MethodCallExpr methodCall)
+	/** Extract the argument from the By.xpath call
+	 * 
+	 * @param methodCallExpr
+	 * @param values
+	 * @param variables
+	 */
+	private void extractArgumentFromXPath(MethodCallExpr methodCallExpr, List<Node> values, List<NameExpr> variables)
 	{	
 		List<Node> childs = methodCallExpr.getChildNodes();
 		for(int i=0;i<childs.size();i++) {
@@ -761,8 +774,7 @@ public class SeleniumTreeDecomposer {
 					newMethodCall.addArgument(optionSplit[0]+"'\"+"+var.getNameAsString()+"+\"'"+optionSplit[2]);			
 					methodCallExpr.replace(node,newMethodCall);					
 				}				
-			}
-			
+			}			
 		}
 	}
 	
