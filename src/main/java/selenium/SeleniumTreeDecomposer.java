@@ -468,6 +468,9 @@ public class SeleniumTreeDecomposer {
 			methodToAdd.setName(baseMethodName+"_"+index);
 			index++;
 		}
+		if(index>1) {
+			addWarning("Method name duplicate in PO: "+addToClass.getNameAsString()+" the method " + baseMethodName+" is renamed in  "+methodToAdd.getNameAsString());
+		}
 		addToClass.addMember(methodToAdd);	
 		return methodToAdd;
 	}
