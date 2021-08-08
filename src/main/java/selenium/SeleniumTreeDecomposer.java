@@ -616,9 +616,9 @@ public class SeleniumTreeDecomposer {
 		MethodCallExpr locatorInvocation = (MethodCallExpr) findElementInvocation.getChildNodes().get(2);
 		List<Node> nodes = locatorInvocation.getChildNodes();
 		//[By, id/css/others, 'identifier']		
-		String baseGetter = "getFor";
+		String baseGetter = "get";
 		if(findElementInvocation.toString().contains("findElements"))
-			baseGetter = "getListFor";
+			baseGetter = "getList";
 		return baseGetter+nodes.get(1).toString().toUpperCase()+"_"+cleanCharacterForMethod(nodes.get(2).toString());
 	}
 	
