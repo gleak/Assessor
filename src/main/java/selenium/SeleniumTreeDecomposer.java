@@ -32,6 +32,7 @@ import com.github.javaparser.ast.expr.VariableDeclarationExpr;
 import com.github.javaparser.ast.stmt.AssertStmt;
 import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.stmt.ExpressionStmt;
+import com.github.javaparser.ast.stmt.ReturnStmt;
 import com.github.javaparser.ast.stmt.Statement;
 
 
@@ -232,16 +233,14 @@ public class SeleniumTreeDecomposer {
 								methodTestSuite, 
 								lastPageObject,
 								localFieldDeclaration.get(lastPageObject.getNameAsString()), 		
-								expStmt);	
+								expStmt);
 					}else { //nothing special with this assert
 						bodyMethod = methodTestSuite.getBody().get();
 						bodyMethod.addStatement(expStmt);	
-					}		
-					
-					lastPageObject = null;
-					methodToAddStatement = methodTestSuite;		
+					}	
 					//Return to write in the main statement as default
-					
+					lastPageObject = null;
+					methodToAddStatement = methodTestSuite;
 				}
 				else { 
 					//if it's not a special statement (assert), just add it to the bodyMethod of the TestMethod or PageObject Method
@@ -250,27 +249,38 @@ public class SeleniumTreeDecomposer {
 			}else if (clonedNode instanceof BlockStmt) { //2 option, can contain Assert or normal block
 				BlockStmt blockInstruction = (BlockStmt) clonedNode;				
 				if(lastPageObject==null) { //No pageObject, so i don't care what contains or there isn't an assert call				
-					bodyMethod.addAndGetStatement(blockInstruction);
+					bodyMethod.addStatement(blockInstruction);
 				} else if(searchForAssertInBlockStmt(blockInstruction)) {
-					analyzeAssertCallBlockStmt(methodTestSuite,lastPageObject, localFieldDeclaration.get(lastPageObject.getNameAsString()), methodToAddStatement,
-							bodyMethod, blockInstruction,values,arguments);				
+					//Add the previews call method, that will return void
+					addPageObjectCall(methodTestSuite, lastPageObject, methodToAddStatement, localFieldDeclaration.get(lastPageObject.getNameAsString()),values,arguments);	
+					List<Node> childInstruction = blockInstruction.getChildNodes();
+					
+					//if the method contains a search for an element, then create the statement, it should never be empty because contains at least 1 assert call
+					if(childInstruction.get(0).toString().contains("driver.findElement")) { 
+							generateAssertCallBlockStmt(methodTestSuite,lastPageObject, localFieldDeclaration.get(lastPageObject.getNameAsString()), 
+									 blockInstruction,values,arguments);					
+					}else { //nothing special with this assert
+						bodyMethod = methodTestSuite.getBody().get();
+						bodyMethod.addStatement(blockInstruction);	
+					}	
 					lastPageObject = null;
 					methodToAddStatement = methodTestSuite;
 				}else {					
 					BlockStmt blockParsed = new BlockStmt();
-					bodyMethod.addAndGetStatement(blockParsed);
+					bodyMethod.addStatement(blockParsed);
 					for(Node child : blockInstruction.getChildNodes()) {
 						ExpressionStmt expStmt = (ExpressionStmt)child.clone();
 						analyzeMethodArguments(expStmt,values,arguments);	
-						blockParsed.addAndGetStatement(expStmt);
+						blockParsed.addStatement(expStmt);
 					}					
 				}
 			}else if (clonedNode instanceof Comment) {
 				bodyMethod.addOrphanComment((Comment) clonedNode);
-			}else 
-				bodyMethod.addStatement((Statement) clonedNode);						
+			}else { 
+				bodyMethod.addStatement((Statement) clonedNode);
+			}
 		}
-		//after all the instruction end, if there is a PageObject declared than add is MethodCallDeclaration to the TestSuite Method
+		//after all the instruction end, if there is a PageObject declared then add his MethodCallDeclaration to the TestSuite Method
 		if(lastPageObject!=null)				
 			addPageObjectCall(methodTestSuite, lastPageObject, methodToAddStatement, localFieldDeclaration.get(lastPageObject.getNameAsString()),values,arguments);					
 				
@@ -477,7 +487,7 @@ public class SeleniumTreeDecomposer {
 			Parameter parameter = new Parameter();
 			parameter.setType("String");		
 			parameter.setName(nameVariable.toString());
-			method.addAndGetParameter(parameter);
+			method.addParameter(parameter);
 		}
 	}
 
@@ -537,14 +547,17 @@ public class SeleniumTreeDecomposer {
 	private void analyzeAssertCallExpStmt(MethodDeclaration methodTestSuite, ClassOrInterfaceDeclaration pageObject, String pageObjectVariable,
 			ExpressionStmt expression) {	
 		BlockStmt bodyMethod;
-		MethodCallExpr assertCall = (MethodCallExpr) expression.getExpression();
+		MethodCallExpr assertCall = (MethodCallExpr) expression.getExpression();		
+		//The first node contains the assert, the second contains the methodCall to the locator
+		MethodCallExpr firstArgumentInvocation = (MethodCallExpr) assertCall.getChildNodes().get(1);
+		MethodCallExpr findElementInvocation = (MethodCallExpr) firstArgumentInvocation.getChildNodes().get(0);
 		List<Node> childNodes = assertCall.getChildNodes(); 		
-		MethodDeclaration methodPO = searchGetterInPO(pageObject,assertCall);
-		boolean addBodyToPO = methodPO==null;
-		if(addBodyToPO) {
+		MethodDeclaration methodPO = searchGetterInPO(pageObject,findElementInvocation);;
+		
+		if(methodPO==null) {
 			//create the method PO statement			
 			methodPO = new MethodDeclaration() 					
-					.setName(generateNameForGetterCalls(assertCall))
+					.setName(generateNameForGetterCalls(findElementInvocation))
 					.setPublic(true);
 			bodyMethod = methodPO.getBody().get();
 			//Node 0 is the commnad
@@ -578,11 +591,11 @@ public class SeleniumTreeDecomposer {
 	 * if it is already defined the method is return else null
 	 * 
 	 * @param pageObject
-	 * @param methodCall
+	 * @param findElementCall
 	 * @return
 	 */
-	private MethodDeclaration searchGetterInPO(ClassOrInterfaceDeclaration pageObject, MethodCallExpr methodCall) {
-		String generatedName = generateNameForGetterCalls(methodCall);
+	private MethodDeclaration searchGetterInPO(ClassOrInterfaceDeclaration pageObject, MethodCallExpr findElementCall) {
+		String generatedName = generateNameForGetterCalls(findElementCall);
 		for(MethodDeclaration method : pageObject.findAll(MethodDeclaration.class)) {
 			if(method.getNameAsString().equals(generatedName)) 
 				return method;
@@ -592,18 +605,18 @@ public class SeleniumTreeDecomposer {
 	
 	/** Generate the name for a getter Call
 	 * 
-	 * @param expression
+	 * @param findElementInvocation
 	 * @return
 	 */
-	private String generateNameForGetterCalls(MethodCallExpr expression) {
-		//The first node contains the assert, the second contains the methodCall to the locator
-		MethodCallExpr firstArgumentInvocation = (MethodCallExpr) expression.getChildNodes().get(1);
-		MethodCallExpr findElementInvocation = (MethodCallExpr) firstArgumentInvocation.getChildNodes().get(0);
-		//The third elment contains the Locator invocation
+	private String generateNameForGetterCalls(MethodCallExpr findElementInvocation) {
+		//The third element contains the Locator invocation
 		MethodCallExpr locatorInvocation = (MethodCallExpr) findElementInvocation.getChildNodes().get(2);
 		List<Node> nodes = locatorInvocation.getChildNodes();
 		//[By, id/css/others, 'identifier']		
-		return "getFor"+nodes.get(1).toString().toUpperCase()+"_"+cleanCharacterForMethod(nodes.get(2).toString());
+		String baseGetter = "getFor";
+		if(findElementInvocation.toString().contains("findElements"))
+			baseGetter = "getListFor";
+		return baseGetter+nodes.get(1).toString().toUpperCase()+"_"+cleanCharacterForMethod(nodes.get(2).toString());
 	}
 	
 	/** Replace invalid character like - , ", : and . for a methodDeclaration
@@ -616,6 +629,8 @@ public class SeleniumTreeDecomposer {
 	}
 
 	/** This method will analyze a BlockStmt assert instruction 
+	 * From the first instruction the name of the Getter is recovered
+	 * From the second last the return attribute is recorded
 	 * 
 	 * @param methodTestSuite
 	 * @param lastPageVariable
@@ -625,38 +640,58 @@ public class SeleniumTreeDecomposer {
 	 * @param values
 	 * @param argumentsName
 	 */
-	private void analyzeAssertCallBlockStmt(MethodDeclaration methodTestSuite,ClassOrInterfaceDeclaration pageObject,
-			String lastPageVariable, MethodDeclaration methodPO,
-			BlockStmt bodyMethod, BlockStmt blockInstruction,List<Node> values,List<NameExpr> argumentsName) {
-		BlockStmt newBlockStmt = new BlockStmt();
-		bodyMethod.addAndGetStatement(newBlockStmt);
-		Node lastNode = null;
-		for(Node child : blockInstruction.getChildNodes()) {
-			if(child.toString().startsWith("assert")) {				
-				//TODO add call to this method declaration
-				//TODO create a new Getter for this assert
-				VariableDeclarationExpr variableDeclExp = (VariableDeclarationExpr) lastNode.getChildNodes().get(0);
-				methodPO.setType(variableDeclExp.getElementType());
-				VariableDeclarator variableDecl = (VariableDeclarator)variableDeclExp.getChildNodes().get(0);
-				newBlockStmt.addStatement("return " +variableDecl.getNameAsString()+";");
-				
-				addMethod(methodPO,pageObject,values,argumentsName);
-				String statement;
-				if( child instanceof AssertStmt) { //this is a special case
-					statement = createAssertWithAssertStmt(lastPageVariable, methodPO, values, child, variableDecl);	
+	private void generateAssertCallBlockStmt(MethodDeclaration methodTestSuite,ClassOrInterfaceDeclaration pageObject,
+			String lastPageVariable,
+			 BlockStmt blockInstruction,List<Node> values,List<NameExpr> argumentsName) {		
+		List<Node> childs = blockInstruction.getChildNodes();
+		BlockStmt bodyMethod;
+		//The first instruction contains the variable declaration
+		ExpressionStmt stmt = (ExpressionStmt) childs.get(0);		
+		VariableDeclarationExpr variableExpr = (VariableDeclarationExpr) stmt.getChildNodes().get(0);
+		VariableDeclarator variable = (VariableDeclarator)variableExpr.getChildNodes().get(0);
+		//the variable child contains: Type of return value, variable name, operation
+		MethodCallExpr findElement = (MethodCallExpr) variable.getChildNodes().get(2);
+		//If the method call is something like: driver.findElement(By..).getValue(..) then the first MethodCall is the correct argument
+		if(findElement.getChildNodes().size()>=3 && findElement.getChildNodes().get(0) instanceof MethodCallExpr) 	
+				findElement = (MethodCallExpr) findElement.getChildNodes().get(0);
+		MethodDeclaration methodPO = searchGetterInPO(pageObject,findElement);
+		
+		if(methodPO==null) {
+			methodPO = new MethodDeclaration() 					
+					.setName(generateNameForGetterCalls(findElement))
+					.setPublic(true);
+			bodyMethod = methodPO.getBody().get();	
+			Node lastNode = null;
+			for(Node child : childs) {
+				if(child.toString().startsWith("assert")) {					
+					VariableDeclarationExpr variableDeclExp = (VariableDeclarationExpr) lastNode.getChildNodes().get(0);
+					methodPO.setType(variableDeclExp.getElementType());
+					VariableDeclarator variableDecl = (VariableDeclarator)variableDeclExp.getChildNodes().get(0);
+					bodyMethod.addStatement("return " +variableDecl.getNameAsString()+";");					
+					addMethod(methodPO,pageObject,values,argumentsName);						
 				}else {
-					List<Node> childNodes = ((MethodCallExpr)((ExpressionStmt)child).getExpression()).getChildNodes(); 
-					statement = createAssertWithNormalStmt(childNodes,lastPageVariable, methodPO, values);		
-				}	
-				bodyMethod = methodTestSuite.getBody().get();
-				bodyMethod.addStatement(statement);
-			}else {
-				ExpressionStmt expStmt = (ExpressionStmt)child.clone();
-				analyzeMethodArguments(expStmt,values,argumentsName);	
-				newBlockStmt.addStatement(expStmt);
+					ExpressionStmt expStmt = (ExpressionStmt)child.clone();
+					analyzeMethodArguments(expStmt,values,argumentsName);	
+					bodyMethod.addStatement(expStmt);
+				}
+				lastNode = child;
 			}
-			lastNode = child;
 		}
+		String testSuiteMethodcallStmt;
+		bodyMethod = methodPO.getBody().get();
+		Node lastInstruction = childs.get(childs.size()-1);
+		if( lastInstruction instanceof AssertStmt) { //this is a special case
+			Node secondLastNode = childs.get(childs.size()-2);
+			VariableDeclarationExpr variableDeclExp = (VariableDeclarationExpr) secondLastNode.getChildNodes().get(0);
+			VariableDeclarator variableDecl = (VariableDeclarator)variableDeclExp.getChildNodes().get(0);
+			
+			testSuiteMethodcallStmt = createAssertWithAssertStmt(lastPageVariable, methodPO, values, lastInstruction, variableDecl);	
+		}else {
+			List<Node> childNodes = ((MethodCallExpr)((ExpressionStmt)lastInstruction).getExpression()).getChildNodes(); 
+			testSuiteMethodcallStmt = createAssertWithNormalStmt(childNodes,lastPageVariable, methodPO, values);		
+		}	
+		bodyMethod = methodTestSuite.getBody().get();
+		bodyMethod.addStatement(testSuiteMethodcallStmt);
 		values.clear();
 		argumentsName.clear();
 	}
