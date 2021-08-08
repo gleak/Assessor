@@ -619,13 +619,13 @@ public class SeleniumTreeDecomposer {
 		return baseGetter+nodes.get(1).toString().toUpperCase()+"_"+cleanCharacterForMethod(nodes.get(2).toString());
 	}
 	
-	/** Replace invalid character like - , ", : and . for a methodDeclaration
+	/** Replace invalid character like - , ", : and . () for a methodDeclaration
 	 * 
 	 * @param value
 	 * @return
 	 */
 	private String cleanCharacterForMethod(String value) {
-		return value.replace("-","_").replace("\"", "").replace(":", "").replace(".", "");
+		return value.replace("-","_").replace("\"", "").replace(":", "").replace(".", "").replace("(", "").replace(")", "");
 	}
 
 	/** This method will analyze a BlockStmt assert instruction 
