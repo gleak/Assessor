@@ -641,6 +641,8 @@ public class SeleniumTreeDecomposer {
 		valueToReplace.add("@");
 		valueToReplace.add("=");
 		valueToReplace.add("*");
+		valueToReplace.add(" ");
+		valueToReplace.add(">");
 		value =  value.replace("-","_");
 		for(String removeThis : valueToReplace) {
 			value = value.replace(removeThis, "");
