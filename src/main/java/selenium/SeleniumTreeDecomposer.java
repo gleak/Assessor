@@ -22,7 +22,6 @@ import com.github.javaparser.ast.comments.Comment;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.BinaryExpr;
 import com.github.javaparser.ast.expr.EnclosedExpr;
-import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.LiteralExpr;
 import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.NameExpr;
@@ -32,7 +31,6 @@ import com.github.javaparser.ast.expr.VariableDeclarationExpr;
 import com.github.javaparser.ast.stmt.AssertStmt;
 import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.stmt.ExpressionStmt;
-import com.github.javaparser.ast.stmt.ReturnStmt;
 import com.github.javaparser.ast.stmt.Statement;
 
 
@@ -628,7 +626,27 @@ public class SeleniumTreeDecomposer {
 	 * @return
 	 */
 	private String cleanCharacterForMethod(String value) {
-		return value.replace("-","_").replace("\"", "").replace(":", "").replace(".", "").replace("(", "").replace(")", "");
+		List<String> valueToReplace = new LinkedList<String>();
+		valueToReplace.add("\"");
+		valueToReplace.add(":");
+		valueToReplace.add(".");
+		valueToReplace.add("(");
+		valueToReplace.add(")");
+		valueToReplace.add("'");
+		valueToReplace.add("\\");
+		valueToReplace.add("/");
+		valueToReplace.add("#");
+		valueToReplace.add("[");
+		valueToReplace.add("]");
+		valueToReplace.add("@");
+		valueToReplace.add("=");
+		valueToReplace.add("*");
+		value =  value.replace("-","_");
+		for(String removeThis : valueToReplace) {
+			value = value.replace(removeThis, "");
+		}
+		return value;
+			
 	}
 
 	/** This method will analyze a BlockStmt assert instruction 
@@ -898,6 +916,7 @@ public class SeleniumTreeDecomposer {
 	 * 
 	 * @param log
 	 */	
+	@SuppressWarnings("deprecation")
 	private void addLog(String log) {
 		logs.add((new Date()).toLocaleString() +" - "+log);
 	}

@@ -6,7 +6,7 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Date;
+
 
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
@@ -14,13 +14,14 @@ import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 
 import com.github.javaparser.symbolsolver.JavaSymbolSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
-import com.github.javaparser.symbolsolver.resolution.typesolvers.JavaParserTypeSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeSolver;
 
 
-public class Main {
+public class SeleniumConvertTool {
 
-	public static void main(String[] args) throws IOException {
+	public static void main(String[] args) throws IOException{
+		
+		 
 		String inputDir = "C:\\SeleniumTest\\";
 		String outputDir = inputDir+"\\Output\\";
 		
