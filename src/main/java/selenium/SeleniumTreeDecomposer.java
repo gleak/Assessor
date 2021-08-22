@@ -199,7 +199,7 @@ public class SeleniumTreeDecomposer {
 					localFieldDeclaration.put(pageObjectName, "_"+pageObjectName);
 					//The initialization of the PageObject is always formed by the 3 variables driver,var,js 
 					methodTestSuite.getBody().get()
-						.addStatement(pageObjectName+ " "+localFieldDeclaration.get(pageObjectName) +" = new "+pageObjectName+"(driver,vars,js);");
+						.addStatement(pageObjectName+ " "+localFieldDeclaration.get(pageObjectName) +" = new "+pageObjectName+"(driver,js,vars);");
 				}
 				//Now a new void method is created with the PageMethodName.
 				//if the method will need a different return statement, this will be change in a second time
