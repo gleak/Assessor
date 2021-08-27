@@ -61,6 +61,7 @@ public class SeleniumTreeDecomposer {
 	
 	public SeleniumTreeDecomposer() {		
 		centralUnit = new CompilationUnit();	
+		centralUnit.addImport("org.junit.BeforeClass");
 		centralClass = createClass(centralUnit,basePackage);
 		_addBeforeClassStaticMethod(centralClass);		
 		units.add(centralUnit);
@@ -72,6 +73,7 @@ public class SeleniumTreeDecomposer {
 		BlockStmt block = new BlockStmt();
 		block.addStatement("System.setProperty(\"webdriver.gecko.driver\",\"InsertGeckoPathHere\");");
 		method.setBody(block);		
+		
 	}
 
 	/** Returns all the compilation unit created
