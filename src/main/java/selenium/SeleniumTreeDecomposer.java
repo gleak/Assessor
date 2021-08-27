@@ -38,6 +38,9 @@ public class SeleniumTreeDecomposer {
 	//Delimiter generated from SeleniumIDE Extension
 	private static final String DELIMITER_PO_DECLARATION = "System.out.println(\"{SeleniumIDEExt}";
 	private static final String DELIMITER_BACK_TO_MAIN = DELIMITER_PO_DECLARATION+"backToMain\");";
+	
+	
+	
 	//Key for share data between methods
 	private static final String KEY_HASH_PO_NAME = "pageObjectName";
 	private static final String KEY_HASH_PO_METHOD = "pageMethodName";
@@ -59,9 +62,18 @@ public class SeleniumTreeDecomposer {
 	public SeleniumTreeDecomposer() {		
 		centralUnit = new CompilationUnit();	
 		centralClass = createClass(centralUnit,basePackage);
+		_addBeforeClassStaticMethod(centralClass);		
 		units.add(centralUnit);
 	}
 	
+	private void _addBeforeClassStaticMethod(ClassOrInterfaceDeclaration classToAdd) {
+		MethodDeclaration method = classToAdd.addMethod("setup", Modifier.Keyword.PUBLIC);
+		method.setType("void").setStatic(true).addAnnotation("BeforeClass");
+		BlockStmt block = new BlockStmt();
+		block.addStatement("System.setProperty(\"webdriver.gecko.driver\",\"InsertGeckoPathHere\");");
+		method.setBody(block);		
+	}
+
 	/** Returns all the compilation unit created
 	 * 
 	 * @return units
@@ -215,6 +227,11 @@ public class SeleniumTreeDecomposer {
 			
 			BlockStmt bodyMethod = methodToAddStatement.getBody().get();
 			if(clonedNode instanceof ExpressionStmt) { //2 option, is Assert or normal command
+				if(clonedNode.toString().contains("sendKeys")) {
+					String clearCommand = createClearCommandBeforeSendKeys((ExpressionStmt)clonedNode);
+					bodyMethod.addStatement(clearCommand);		
+				}
+				
 				ExpressionStmt expStmt = (ExpressionStmt)clonedNode;
 				//if the pageObject isn't already found, then there is no need to check for arguments
 				if(lastPageObject!=null)  				
@@ -246,7 +263,7 @@ public class SeleniumTreeDecomposer {
 				}
 			}else if (clonedNode instanceof BlockStmt) { //2 option, can contain Assert or normal block
 				BlockStmt blockInstruction = (BlockStmt) clonedNode;				
-				if(lastPageObject==null) { //No pageObject, so i don't care what contains or there isn't an assert call				
+				if(lastPageObject==null) { //No pageObject, so i don't care what contains or there isn't an assert call
 					bodyMethod.addStatement(blockInstruction);
 				} else if(searchForAssertInBlockStmt(blockInstruction)) {
 					//Add the previews call method, that will return void
@@ -282,6 +299,20 @@ public class SeleniumTreeDecomposer {
 		if(lastPageObject!=null)				
 			addPageObjectCall(methodTestSuite, lastPageObject, methodToAddStatement, localFieldDeclaration.get(lastPageObject.getNameAsString()),values,arguments);					
 				
+	}
+
+	private String createClearCommandBeforeSendKeys(ExpressionStmt instruction) {
+		Node clonedClear = instruction.clone().getChildNodes().get(0);
+		String command = "";
+		for(Node child : clonedClear.getChildNodes()) {
+			if(child.toString().contains("sendKeys")) {
+				command+="clear();";
+				break;
+			}else {
+				command+=child.toString()+".";
+			}
+		}
+		return command;
 	}
 
 
