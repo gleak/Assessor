@@ -871,7 +871,6 @@ public class SeleniumTreeDecomposer {
 				
 				extractArgumentFromXPath((MethodCallExpr)childs.get(3).getChildNodes().get(0),values, variables );
 			}else {			
-				System.out.println(childs);
 				extractArgumentFromXPath((MethodCallExpr)childs.get(0),values, variables );
 			}
 		}
