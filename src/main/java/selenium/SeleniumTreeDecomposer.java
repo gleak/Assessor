@@ -941,8 +941,7 @@ public class SeleniumTreeDecomposer {
 							}else {
 								variableCommand = optionSplit[k];
 							}							
-							methodArgument+="\'"+ variableCommand +"\'";
-							System.out.println(methodArgument);
+							methodArgument+="\'"+ variableCommand +"\'";							
 						}else {
 							methodArgument+=optionSplit[k];
 						}
