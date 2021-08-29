@@ -929,7 +929,7 @@ public class SeleniumTreeDecomposer {
 						continue;//No variabile to look at
 	
 					String[] optionSplit = literal.toString().replaceAll("(\\\\)", "").split("'");
-					String methodArgument = optionSplit[0]+"'";
+					String methodArgument = optionSplit[0];
 					for(int k=1;k<optionSplit.length;k++) {
 						if(k%2==1) { // -> "//input[@name=\'status2\' and @value=\'Listed\']" -> odd = variable, pair = command
 							String variableCommand;
@@ -942,6 +942,7 @@ public class SeleniumTreeDecomposer {
 								variableCommand = optionSplit[k];
 							}							
 							methodArgument+="\'"+ variableCommand +"\'";
+							System.out.println(methodArgument);
 						}else {
 							methodArgument+=optionSplit[k];
 						}
