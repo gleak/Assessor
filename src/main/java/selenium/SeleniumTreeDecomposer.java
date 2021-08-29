@@ -921,7 +921,6 @@ public class SeleniumTreeDecomposer {
 				MethodCallExpr xPathCall = (MethodCallExpr)node;				
 				if(xPathCall.toString().startsWith("By.xpath")) {
 					//the child is: By, xpath, realPathString
-				
 					
 					Node literal = xPathCall.getChildNodes().get(2);
 					if(!(literal instanceof StringLiteralExpr)) continue; 	
@@ -933,10 +932,16 @@ public class SeleniumTreeDecomposer {
 					String methodArgument = optionSplit[0]+"'";
 					for(int k=1;k<optionSplit.length;k++) {
 						if(k%2==1) { // -> "//input[@name=\'status2\' and @value=\'Listed\']" -> odd = variable, pair = command
-							values.add(new StringLiteralExpr(optionSplit[k]));	
-							NameExpr var = new NameExpr("key"+values.size());
-							variables.add(var);		
-							methodArgument+="\"+"+ var.getNameAsString() +"+\"\'";
+							String variableCommand;
+							if(optionSplit[k-1].toString().contains(". =") || optionSplit[k-1].toString().contains("text=") || optionSplit[k-1].toString().contains("value=") ) {
+								values.add(new StringLiteralExpr(optionSplit[k]));	
+								NameExpr var = new NameExpr("key"+values.size());
+								variables.add(var);		
+								variableCommand ="\"+"+ var.getNameAsString() +"+\"";
+							}else {
+								variableCommand = optionSplit[k];
+							}							
+							methodArgument+="\'"+ variableCommand +"\'";
 						}else {
 							methodArgument+=optionSplit[k];
 						}
