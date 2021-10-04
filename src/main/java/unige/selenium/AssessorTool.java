@@ -17,7 +17,7 @@ import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSol
 import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeSolver;
 
 
-public class ConvertTool {
+public class AssessorTool {
 
 	public static void main(String[] args) throws IOException{
 		

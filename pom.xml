@@ -37,7 +37,7 @@
 		            <configuration>
 		                <archive>
 		                <manifest>
-		                    <mainClass>unige.selenium.ConvertTool</mainClass>
+		                    <mainClass>unige.selenium.AssessorTool</mainClass>
 		                </manifest>
 		                </archive>
 		                <descriptorRefs>
