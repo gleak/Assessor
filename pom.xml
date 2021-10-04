@@ -2,17 +2,52 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>unige</groupId>
   <artifactId>selenium</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
-  <name>SeleniumIDERefactor</name>
-  <properties>
-    <maven.compiler.source>1.15</maven.compiler.source>
-    <maven.compiler.target>1.15</maven.compiler.target>
+  <version>1.0.0</version>
+  <name>SeleniumConvertTool</name>
+  <packaging>jar</packaging>
+  <properties>   
+     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+      <maven.compiler.source>1.8</maven.compiler.source>
+ 	   <maven.compiler.target>1.8</maven.compiler.target>
   </properties>
   <dependencies>
   	<dependency>
   		<groupId>com.github.javaparser</groupId>
   		<artifactId>javaparser-symbol-solver-core</artifactId>
-  		<version>3.22.1</version>
+  		<version>3.22.1</version>  		
   	</dependency>  	
+  	<dependency>
+	    <groupId>org.apache.maven</groupId>
+	    <artifactId>maven-plugin-api</artifactId>
+	    <version>3.8.3</version>
+	</dependency>
   </dependencies>
+  <build>
+  	<plugins>
+  		<plugin>
+		    <groupId>org.apache.maven.plugins</groupId>
+		    <artifactId>maven-assembly-plugin</artifactId>
+		    <executions>
+		        <execution>
+		            <phase>package</phase>
+		            <goals>
+		                <goal>single</goal>
+		            </goals>
+		            <configuration>
+		                <archive>
+		                <manifest>
+		                    <mainClass>unige.selenium.ConvertTool</mainClass>
+		                </manifest>
+		                </archive>
+		                <descriptorRefs>
+		                    <descriptorRef>jar-with-dependencies</descriptorRef>
+		                </descriptorRefs>
+		            </configuration>
+		        </execution>
+		    </executions>
+		</plugin>		
+  	</plugins>
+  </build>
+  
 </project>

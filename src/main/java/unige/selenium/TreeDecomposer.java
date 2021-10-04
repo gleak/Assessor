@@ -1,4 +1,4 @@
-package selenium;
+package unige.selenium;
 
 import java.util.Date;
 import java.util.HashMap;
@@ -34,7 +34,7 @@ import com.github.javaparser.ast.stmt.ExpressionStmt;
 import com.github.javaparser.ast.stmt.Statement;
 
 
-public class SeleniumTreeDecomposer {
+public class TreeDecomposer {
 	//Delimiter generated from SeleniumIDE Extension
 	private static final String DELIMITER_PO_DECLARATION = "System.out.println(\"{SeleniumIDEExt}";
 	private static final String DELIMITER_BACK_TO_MAIN = DELIMITER_PO_DECLARATION+"backToMain\");";
@@ -59,7 +59,7 @@ public class SeleniumTreeDecomposer {
 	//List of Logs
 	private final List<String> logs = new LinkedList<>();
 	
-	public SeleniumTreeDecomposer() {		
+	public TreeDecomposer() {		
 		centralUnit = new CompilationUnit();	
 		centralUnit.addImport("org.junit.BeforeClass");
 		centralClass = createClass(centralUnit,basePackage);

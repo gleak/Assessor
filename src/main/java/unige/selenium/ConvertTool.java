@@ -1,4 +1,4 @@
-package selenium;
+package unige.selenium;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -17,18 +17,20 @@ import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSol
 import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeSolver;
 
 
-public class SeleniumConvertTool {
+public class ConvertTool {
 
 	public static void main(String[] args) throws IOException{
 		
-		 
-		String inputDir = "C:\\SeleniumTest\\";
-		String outputDir = inputDir+"\\Output\\";
+		if(args.length!=1) {
+			throw new IllegalArgumentException("Expected one argument, full input path for example C:/Code");
+		}
 		
-		
+		String inputDir = args[0];
+		String outputDir = inputDir+"/Output/";
+	
 		File[] matchingFiles = searchFilesToAnalyze(inputDir);
 		
-		SeleniumTreeDecomposer selDecomposer =  new SeleniumTreeDecomposer();
+		TreeDecomposer selDecomposer =  new TreeDecomposer();
 		
 		for(File file : matchingFiles) {
 			CompilationUnit compilationUnit = recoverCompilationUnit(file);			
@@ -38,19 +40,21 @@ public class SeleniumConvertTool {
 		writeNewClass(outputDir, selDecomposer);
 		
 		writeLogs(outputDir, selDecomposer);
+		System.out.println("Refactoring complete");
 	}
 
-	private static void writeLogs(String outputDir, SeleniumTreeDecomposer selDecomposer) throws IOException {
+	private static void writeLogs(String outputDir, TreeDecomposer selDecomposer) throws IOException {
 		if(selDecomposer.getLogs().size()>0) {				
 			FileWriter writer = new FileWriter(outputDir+"logs.txt");
 			for(String row : selDecomposer.getLogs()) {
-				writer.write(row+"\n");
+				writer.write(row+"\n");			
 			}
 			writer.close();
+			System.out.println("Logs generated");
 		}
 	}
 
-	private static void writeNewClass(String outputDir, SeleniumTreeDecomposer selDecomposer) throws IOException {
+	private static void writeNewClass(String outputDir, TreeDecomposer selDecomposer) throws IOException {
 		final String poDirectory = "PO/";
 		File directory = new File(outputDir+poDirectory);
 		if (!directory.exists())
