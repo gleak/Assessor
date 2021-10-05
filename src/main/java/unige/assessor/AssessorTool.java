@@ -1,4 +1,4 @@
-package unige.selenium;
+package unige.assessor;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -20,17 +20,15 @@ import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeS
 public class AssessorTool {
 
 	public static void main(String[] args) throws IOException{
-		
-		if(args.length!=1) {
-			throw new IllegalArgumentException("Expected one argument, full input path for example C:/Code");
-		}
-		
+		boolean normalize = false;
+		String poPrefix = "";
+
 		String inputDir = args[0];
 		String outputDir = inputDir+"/Output/";
 	
 		File[] matchingFiles = searchFilesToAnalyze(inputDir);
 		
-		TreeDecomposer selDecomposer =  new TreeDecomposer();
+		TreeDecomposer selDecomposer =  new TreeDecomposer(normalize,poPrefix);
 		
 		for(File file : matchingFiles) {
 			CompilationUnit compilationUnit = recoverCompilationUnit(file);			

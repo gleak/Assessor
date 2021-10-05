@@ -1,4 +1,4 @@
-package unige.selenium;
+package unige.assessor;
 
 import java.util.Date;
 import java.util.HashMap;
@@ -34,9 +34,10 @@ import com.github.javaparser.ast.stmt.ExpressionStmt;
 import com.github.javaparser.ast.stmt.Statement;
 
 
+
 public class TreeDecomposer {
 	//Delimiter generated from SeleniumIDE Extension
-	private static final String DELIMITER_PO_DECLARATION = "System.out.println(\"{SeleniumIDEExt}";
+	private static final String DELIMITER_PO_DECLARATION = "System.out.println(\"{ASSESSOR}";
 	private static final String DELIMITER_BACK_TO_MAIN = DELIMITER_PO_DECLARATION+"backToMain\");";
 	
 	
@@ -45,7 +46,7 @@ public class TreeDecomposer {
 	private static final String KEY_HASH_PO_NAME = "pageObjectName";
 	private static final String KEY_HASH_PO_METHOD = "pageMethodName";
 	//Standard prefix for all the PO Object
-	private static final String PO_PREFIX = "PO_";
+	private final String PO_PREFIX;
 	//List of base Imports
 	private List<ImportDeclaration> baseImports = new LinkedList<>();
 	//Base Package name
@@ -58,11 +59,15 @@ public class TreeDecomposer {
 	private final ClassOrInterfaceDeclaration centralClass;
 	//List of Logs
 	private final List<String> logs = new LinkedList<>();
+	//Normalize PO Name to lower case
+	private final boolean normalize;
 	
-	public TreeDecomposer() {		
+	public TreeDecomposer(boolean normalize, String poPrefix) {
 		centralUnit = new CompilationUnit();	
 		centralUnit.addImport("org.junit.BeforeClass");
 		centralClass = createClass(centralUnit,basePackage);
+		this.normalize = normalize;
+		this.PO_PREFIX = poPrefix;
 		_addBeforeClassStaticMethod(centralClass);		
 		units.add(centralUnit);
 	}
@@ -229,6 +234,8 @@ public class TreeDecomposer {
 			
 			BlockStmt bodyMethod = methodToAddStatement.getBody().get();
 			if(clonedNode instanceof ExpressionStmt) { //2 option, is Assert or normal command
+				
+				
 				if(clonedNode.toString().contains("sendKeys")) {
 					String clearCommand = createClearCommandBeforeSendKeys((ExpressionStmt)clonedNode);
 					bodyMethod.addStatement(clearCommand);		
@@ -820,9 +827,17 @@ public class TreeDecomposer {
 		String[] values = argument.toString().replaceAll("\"","").split(":");
 		if(values.length!=3) 
 			return null;
-		hashMap.put(KEY_HASH_PO_NAME, PO_PREFIX+values[1].toLowerCase());
+		
+		hashMap.put(KEY_HASH_PO_NAME, getPOName(values[1]));
 		hashMap.put(KEY_HASH_PO_METHOD, values[2]);		
 		return hashMap;
+	}
+	
+	private String getPOName(String input) {
+		if(this.normalize) {
+			input = input.toLowerCase();
+		}
+		return PO_PREFIX+input;
 	}
 	
 	
@@ -867,8 +882,7 @@ public class TreeDecomposer {
 		if(containsSendKeys) 
 			extractArgumentFromSendKeys(childs,methodCall, values, variables  );
 		if(containsXPath) 	{	
-			if(childs.get(0) instanceof NameExpr) { //add data in variables
-				
+			if(childs.get(0) instanceof NameExpr) { //add data in variables				
 				extractArgumentFromXPath((MethodCallExpr)childs.get(3).getChildNodes().get(0),values, variables );
 			}else {			
 				extractArgumentFromXPath((MethodCallExpr)childs.get(0),values, variables );
