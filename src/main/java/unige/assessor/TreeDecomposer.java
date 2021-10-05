@@ -22,6 +22,7 @@ import com.github.javaparser.ast.comments.Comment;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.BinaryExpr;
 import com.github.javaparser.ast.expr.EnclosedExpr;
+import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.LiteralExpr;
 import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.expr.NameExpr;
@@ -32,8 +33,6 @@ import com.github.javaparser.ast.stmt.AssertStmt;
 import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.stmt.ExpressionStmt;
 import com.github.javaparser.ast.stmt.Statement;
-
-
 
 public class TreeDecomposer {
 	//Delimiter generated from SeleniumIDE Extension
@@ -70,8 +69,32 @@ public class TreeDecomposer {
 		this.PO_PREFIX = poPrefix;
 		_addBeforeClassStaticMethod(centralClass);		
 		units.add(centralUnit);
+		_addHelperClass();
 	}
 	
+	private void _addHelperClass() {
+		CompilationUnit myUtils = new CompilationUnit();	
+		myUtils.addImport("java.util.function.Function");
+		myUtils.addImport("org.openqa.selenium.By");
+		myUtils.addImport("org.openqa.selenium.WebDriver");
+		myUtils.addImport("org.openqa.selenium.support.ui.WebDriverWait");
+		myUtils.setPackageDeclaration(basePackage+".PO");
+		ClassOrInterfaceDeclaration clazz = myUtils.addClass("MyUtils").setPublic(true).setAbstract(true);
+		MethodDeclaration method = clazz.addMethod("WaitForElementLoaded", Modifier.Keyword.PUBLIC)
+				.setStatic(true).setType("void");
+		method.addAndGetParameter("WebDriver", "driver");
+		method.addAndGetParameter("By", "reference");
+		BlockStmt block = new BlockStmt();
+		block.addStatement("WebDriverWait waitFor = new WebDriverWait(driver,10);");
+		block.addStatement("waitFor.until( new Function<WebDriver,Boolean>(){\n"
+				+ "			public Boolean apply(WebDriver driver) {\n"
+				+ "				 return driver.findElement( reference).isDisplayed();\n"
+				+ "			}\n"
+				+ "		});");		
+		method.setBody(block);	
+		units.add(myUtils);
+	}
+
 	private void _addBeforeClassStaticMethod(ClassOrInterfaceDeclaration classToAdd) {
 		MethodDeclaration method = classToAdd.addMethod("setup", Modifier.Keyword.PUBLIC);
 		method.setType("void").setStatic(true).addAnnotation("BeforeClass");
@@ -184,7 +207,7 @@ public class TreeDecomposer {
 		List<Node> values = new LinkedList<>();
 		//List for each argument in the Method Declaration
 		List<NameExpr> arguments = new LinkedList<NameExpr>();
-		
+		boolean waitForElementFound = false;
 		for(Node node : blockStmt.get().getChildNodes()) {
 			
 			Map<String,String> delimiterFound = checkDelimiterInstruction(node);
@@ -205,6 +228,7 @@ public class TreeDecomposer {
 					methodToAddStatement = methodTestSuite;
 					continue;
 				}
+				waitForElementFound = false;
 				//If a delimiter is found, get the pageObject Name
 				String pageObjectName = delimiterFound.get(KEY_HASH_PO_NAME);
 				//recover the pageObject from the class
@@ -235,6 +259,11 @@ public class TreeDecomposer {
 			BlockStmt bodyMethod = methodToAddStatement.getBody().get();
 			if(clonedNode instanceof ExpressionStmt) { //2 option, is Assert or normal command
 				
+				if( lastPageObject!=null && !waitForElementFound && clonedNode.toString().contains("click") ) {
+					//create Wait for element to prevent missing loading on async loading
+					createWaitForElement((ExpressionStmt) clonedNode,bodyMethod);
+					waitForElementFound = true;
+				}
 				
 				if(clonedNode.toString().contains("sendKeys")) {
 					String clearCommand = createClearCommandBeforeSendKeys((ExpressionStmt)clonedNode);
@@ -308,6 +337,14 @@ public class TreeDecomposer {
 		if(lastPageObject!=null)				
 			addPageObjectCall(methodTestSuite, lastPageObject, methodToAddStatement, localFieldDeclaration.get(lastPageObject.getNameAsString()),values,arguments);					
 				
+	}
+
+	private void createWaitForElement(ExpressionStmt instruction, BlockStmt bodyMethod) {
+		Node cloned = instruction.clone().getChildNodes().get(0);
+		MethodCallExpr methodCall = (MethodCallExpr) cloned.getChildNodes().get(0);
+		Expression argument = methodCall.getArgument(0);
+		bodyMethod.addStatement("By elem = " + argument.toString() + ";");
+		bodyMethod.addStatement("MyUtils.WaitForElementLoaded(driver,elem);");
 	}
 
 	private String createClearCommandBeforeSendKeys(ExpressionStmt instruction) {
